@@ -1,16 +1,23 @@
 # cattoy
 
-cattoy loads website logs into an SQLite virtual table where they can be played with using SQL queries.
+Play with website logs using SQL.
 
-It requires a website that follows EuPathDB's file naming and location conventions so that the log file can be located for a given hostname.
-
-It currently only supports the Apache HTTPD access log. Support for Tomcat's catalina and WDK application logs are future desires.
+cattoy loads website logs into an SQLite virtual table where they can be queried with SQL.
 
 ### Requirements
 
-- sqlite3 with support for external modules. The stock CentOS sqlite package meets this requirement.
+- sqlite3 compiled with support for external modules. The stock CentOS sqlite package meets this requirement.
 
-- a website that follows EuPathDB's file naming and location conventions so that the log file can be located for a given hostname. Alternatively the `access_log.so` module can be manually loaded into an `sqlite3` session and a virtual table manually created for an apache log file.
+- A website that follows EuPathDB's file naming and location conventions so that the log file can be located for a given hostname. Alternatively the `access_log.so` module can be manually loaded into an `sqlite3` session and a virtual table manually created for an apache log file.
+
+- The expected log format is NCSA combined with the addition of %D.
+
+    %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" %D
+
+### Caveats
+
+It currently only supports the Apache HTTPD access log. Support for Tomcat's catalina and WDK application logs are future desires.
+
 
 ### Build
 
