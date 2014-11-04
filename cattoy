@@ -33,17 +33,26 @@ EOF
 test -z $1 && usage;
 
 HOST=$1
-APACHE_LOG="/var/log/httpd/${HOST}/access_log"
+ACCESS_LOG="/var/log/httpd/${HOST}/access_log"
+ERROR_LOG="/var/log/httpd/${HOST}/error_log"
 
-if [[ ! -e "$APACHE_LOG" ]]; then
-  echo "log not found: $APACHE_LOG"
+if [[ ! -e "$ACCESS_LOG" ]]; then
+  echo "log not found: $ACCESS_LOG"
+  exit 1
+fi
+
+if [[ ! -e "$ERROR_LOG" ]]; then
+  echo "log not found: $ERROR_LOG"
   exit 1
 fi
 
 INIT="
 .prompt 'cattoy> '
 .load access_log.so
-create virtual table access_log using access_log('$APACHE_LOG');
+.load error_log.so
+create virtual table access_log using access_log('$ACCESS_LOG');
+create virtual table error_log using error_log('$ERROR_LOG');
 "
+echo "$INIT"
 
 sqlite3 -init <(echo "$INIT")
