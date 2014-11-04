@@ -13,11 +13,23 @@ SQLITE_EXTENSION_INIT1;
 #include <zlib.h>
 
 /**
-The expected log format is Apache hTTPD Server's 2.3 error log format (versions before 
-httpd 2.4 do not allow custom log formats).
+The expected log format is Apache hTTPD Server's 2.3 error log format 
+at "LogLevel warn". Other LogLevels will produce incompatible formats.
+(versions before httpd 2.4 do not allow custom log formats).
 
   [Tue Nov 04 00:26:42 2014] [error] [client 208.65.89.219] which: no inkscape in (/sbin:/usr/sbin:/bin:/usr/bin)
   [Tue Nov 04 00:27:07 2014] [error] [client 208.65.89.219] [Tue Nov  4 00:27:07 2014] gbrowse: DBD::Oracle::db ping failed: ORA-03135: connection lost contact (DBD ERROR: OCISessionServerRelease) at /usr/share/perl5/vendor_perl/CGI/Session/Driver/DBI.pm line 136 during global destruction., referer: http://mheiges.trichdb.org/cgi-bin/gbrowse/trichdb/
+
+Observation: The log level is not always included in older versions of Apache 
+(whatever was on CentOS from 2011 (httpd 2.0?)). httpd 2.2 seems to always inlude
+it (but I have not looked for official confirmation).
+
+ToDo: 
+I believe all log entries first two fields. Beyond that I should check log level
+in the line entry and parse the remainder accordingly.
+
+Incompatible example, LogLevel debug:
+  [Tue Nov 04 13:14:32 2014] [debug] proxy_util.c(1852): proxy: worker already initialized
 
  **/
 
@@ -25,12 +37,12 @@ const static char *error_log_sql =
 "    CREATE TABLE error_log (           "
 /* Columns parsed directly from log entries */
 "        time                  TEXT,           "  /*  0 */
-"        log_level             TEXT HIDDEN,    "  /*  1 */
-"        client                TEXT,           "  /*  2 */
+"        log_level             TEXT,           "  /*  1 */
+"        client                TEXT HIDDEN,    "  /*  2 */
 "        message               TEXT,           "  /*  3 */
 /* The following are cols computed from other columns */
-"        remote_host           TEXT            "  /*  4 */
-"        remote_host_int       INTEGER HIDDEN, "  /*  5 */
+"        remote_host           TEXT,           "  /*  4 */
+"        remote_host_int       INTEGER,        "  /*  5 */
 "        time_day              INTEGER,        "  /*  6 */
 "        time_month_s          TEXT HIDDEN,    "  /*  7 */
 "        time_month            INTEGER,        "  /*  8 */
@@ -41,7 +53,9 @@ const static char *error_log_sql =
 "        line                  TEXT HIDDEN     "  /* 13 */
 "     );                                       ";
 
-#define TABLE_COLS_SCAN   4 /* number cols read directly from log entry */
+#define TABLE_COLS_SCAN   3 /* number of internal cols parsed from log entry, 
+                               not including the message which is everything
+                               after the can until the end of line */
 #define TABLE_COLS       14 /* total columns in table: direct log + computed */
 
 
@@ -171,7 +185,7 @@ static int error_log_scanline( error_log_cursor *c )
         if (*start == '\0' )  break;          /* found the end */
         if (*start == '"' ) {
             next = '"';  /* if we started with a quote, end with one */
-	    start++;
+            start++;
         }
         else if (*start == '[' ) {
             next = ']';  /* if we started with a bracket, end with one */
@@ -188,18 +202,37 @@ static int error_log_scanline( error_log_cursor *c )
         start = end;
     }
 
+    /* Handle entries that do not include client IP field, e.g.                                 */
+    /* [Tue Nov 04 13:14:32 2014] [debug] proxy_util.c(1852): proxy: worker already initialized */
+    if (strncmp( c->line_ptrs[2], "client", 6 ) != 0 ) {
+      c->line_ptrs[2] = "";
+      c->line_size[2] = 0;
+    }
+
+    c->line_ptrs[3] = start;
+    c->line_size[3] = strlen(c->line_ptrs[3]);
+    
     /* process special fields */
 
-    /* remote_host */
-    c->line_ptrs[4] = c->line_ptrs[2];
-    c->line_size[4] = c->line_size[2];
 
-    /* assumes: "Tue Nov 04 00:26:42 2014" */
+    /* remote_host: reduce "client 10.10.15.12" to "10.10.15.12" */
+    start = strchr(c->line_ptrs[2], ' ');
+    end   = strchr(c->line_ptrs[2], ']');
+    if(start != NULL) {
+      c->line_ptrs[4] = start + 1;
+      c->line_size[4] = end - start -1;
+    }
+
+    /* remote_host_int. Copy here, convert in column() */
+    c->line_ptrs[5] = c->line_ptrs[4];
+    c->line_size[5] = c->line_size[4];
+
+    /* split time string into components.   */
+    /* assumes: "Tue Nov 04 00:26:42 2014"  */
     /*     idx:  012345678901234567890123   */
     if (( c->line_ptrs[0] != NULL )&&( c->line_size[0] >= 20 )) {
-    /* timestamp field present, so likely a valid record */
         start = c->line_ptrs[0];
-        c->line_ptrs[ 6] = &start[ 0];   c->line_size[ 6] = 3; /* time_day_s */
+        c->line_ptrs[ 6] = &start[ 8];   c->line_size[ 6] = 2; /* time_day   */
         c->line_ptrs[ 7] = &start[ 4];   c->line_size[ 7] = 3; /* time_mon_s */
         c->line_ptrs[ 8] = &start[ 4];   c->line_size[ 8] = 3; /* time_mon   */
         c->line_ptrs[ 9] = &start[20];   c->line_size[ 9] = 4; /* time_year  */
@@ -208,23 +241,9 @@ static int error_log_scanline( error_log_cursor *c )
         c->line_ptrs[12] = &start[17];   c->line_size[12] = 2; /* time_sec   */
     }
 
-    /* req_op, req_url */
-    start = c->line_ptrs[4];
-    end = ( start == NULL ? NULL : strchr( start, ' ' ) );
-    if ( end != NULL ) {
-        c->line_ptrs[18] = start; /* req_op */
-        c->line_size[18] = end - start;
-        start = end + 1;
-    }
-    end = ( start == NULL ? NULL : strchr( start, ' ' ) );
-    if ( end != NULL ) {
-        c->line_ptrs[19] = start;  /* req_url */
-        c->line_size[19] = end - start;
-    }
-
     /* line */
-    c->line_ptrs[20] = c->line;
-    c->line_size[20] = c->line_len;
+    c->line_ptrs[13] = c->line;
+    c->line_size[13] = c->line_len;
 
     c->line_ptrs_valid = 1;
     return SQLITE_OK;
@@ -353,7 +372,7 @@ static int error_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int
     }
 
     switch( cidx ) {
-    case 400: { /* convert IP address string to signed 64 bit integer */
+    case 5: { /* convert IP address string to signed 64 bit integer */
         int            i;
         sqlite_int64   v = 0;
         char          *start = c->line_ptrs[cidx], *end, *oct[4];
@@ -372,7 +391,7 @@ static int error_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int
         sqlite3_result_int64( ctx, v );
         return SQLITE_OK;
     }
-    case 8: { 
+    case 8: {
         int m = 0;
              if ( strncmp( c->line_ptrs[cidx], "Jan", 3 ) == 0 ) m =  1;
         else if ( strncmp( c->line_ptrs[cidx], "Feb", 3 ) == 0 ) m =  2;
