@@ -149,7 +149,7 @@ static int access_log_get_line( access_log_cursor *c )
         char   buf[1024], *bufptr;
         /* ... if so, keep reading */
         while ( 1 ) {
-            bufptr =gzgets( c->fptr, buf, sizeof( buf ) );
+            bufptr = gzgets( c->fptr, buf, sizeof( buf ) );
             if ( bufptr == NULL ) {  /* found the end of the file/error */
                 if (gzeof( c->fptr ) ) {
                     c->eof = 1;
@@ -190,7 +190,7 @@ static int access_log_scanline( access_log_cursor *c )
         if (*start == '\0' )  break;          /* found the end */
         if (*start == '"' ) {
             next = '"';  /* if we started with a quote, end with one */
-	    start++;
+            start++;
         }
         else if (*start == '[' ) {
             next = ']';  /* if we started with a bracket, end with one */
@@ -209,7 +209,7 @@ static int access_log_scanline( access_log_cursor *c )
 
     /* process special fields */
 
-    /* ip_int - just copy */
+    /* remote_host_int. Copy here, convert in column() */
     c->line_ptrs[10] = c->line_ptrs[0];
     c->line_size[10] = c->line_size[0];
 
