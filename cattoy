@@ -1,0 +1,51 @@
+#!/bin/bash
+
+########################################################################
+
+usage() {
+  this="$(basename "$0")"
+
+  cat <<EOF
+
+Load website logs into an SQLite virtual table where they
+can be queried with SQL.
+
+Currently only supports the Apache HTTPD access log file for
+a website that follows EuPathDB's file naming and location
+conventions.
+
+Usage:
+  $this <hostname>
+
+Examples:
+ $this dev.toxodb.org
+
+This utility is experimental and unsupported.
+EOF
+
+  exit 1
+}
+
+########################################################################
+# MAIN
+########################################################################
+
+test -z $1 && usage;
+
+HOST=$1
+APACHE_LOG="/var/log/httpd/${HOST}/access_log"
+
+if [[ ! -e "$APACHE_LOG" ]]; then
+  echo "log not found: $APACHE_LOG"
+  exit 1
+fi
+
+INIT="
+.prompt 'cattoy> '
+.load httpdlog.so
+create virtual table httpdlog using httpdlog('$APACHE_LOG');
+"
+
+sqlite3 -init <(echo "$INIT")
+
+
