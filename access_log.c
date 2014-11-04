@@ -112,38 +112,6 @@ static char * access_log_trimquote(const char *q_str)
     return u_str;
 }
 
-/*
-Remove quotes unless escaped.
-    "a \"string\""
-becomes 
-    a "string"
- */
-static char * access_log_unquote(const char *q_str)
-{
-  int q_str_len = strlen(q_str);
-
-  char *u_str = malloc(q_str_len);
-  
-  int i;
-  int j = 0;
-  for (i = 0; i < q_str_len; i++) {
-    if ( (q_str[i] != '"' && q_str[i] != '\'') && q_str[i] != '\\') { 
-      u_str[j++] = q_str[i];
-    } else if (q_str[i+1] == '"' && q_str[i] == '\\') { 
-      u_str[j++] = '"';
-    } else if (q_str[i+1] == '\'' && q_str[i] == '\\') { 
-      u_str[j++] = '\'';
-    } else if ( (q_str[i+1] != '"' && q_str[i+1] != '\'') && q_str[i] == '\\') { 
-      u_str[j++] = '\\';
-    }
-  }
-
-  // null terminate string
-  if (j > 0) u_str[j]=0;
-
-  return u_str;
-}
-
 typedef struct access_log_cursor_s {
     sqlite3_vtab_cursor   cur;               /* this must be first */
 
@@ -158,7 +126,6 @@ typedef struct access_log_cursor_s {
     char           *(line_ptrs[TABLE_COLS]); /* array of pointers */
     int            line_size[TABLE_COLS];    /* length of data for each pointer */
 } access_log_cursor;
-
 
 static int access_log_get_line( access_log_cursor *c )
 {
