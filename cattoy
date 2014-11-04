@@ -42,10 +42,8 @@ fi
 
 INIT="
 .prompt 'cattoy> '
-.load httpdlog.so
-create virtual table httpdlog using httpdlog('$APACHE_LOG');
+.load access_log.so
+create virtual table access_log using access_log('$APACHE_LOG');
 "
 
 sqlite3 -init <(echo "$INIT")
-
-

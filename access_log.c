@@ -33,8 +33,8 @@ The expected log format is NCSA combined with the addition of %D.
 %D:             The time taken to serve the request, in microseconds.
 **/
 
-const static char *httpdlog_sql = 
-"    CREATE TABLE httpdlog (           "
+const static char *access_log_sql = 
+"    CREATE TABLE access_log (           "
 /* Columns parsed directly from log entries */
 "        remote_host           TEXT,           "  /*  0 */
 "        remote_logname        TEXT HIDDEN,    "  /*  1 */
@@ -64,11 +64,11 @@ const static char *httpdlog_sql =
 #define TABLE_COLS       21 /* total columns in table: direct log + computed */
 
 
-typedef struct httpdlog_vtab_s {
+typedef struct access_log_vtab_s {
     sqlite3_vtab   vtab;
     sqlite3        *db;
     char           *filename;
-} httpdlog_vtab;
+} access_log_vtab;
 
 
 #define LINESIZE 4096
@@ -80,13 +80,13 @@ File names with a hyphen followed by a number, e.g
     access_log-20141102.gz
 need to be quoted, otherwise the sqlite parser seems to treat
 the hyphen as a minus math operation and throws an error.
-    create virtual table log using httpdlog('access_log-20141102.gz');
+    create virtual table log using access_log('access_log-20141102.gz');
 On the other hand, if we do quote then the quotes are retained
 as literals in the file name so sqlite errors "missing database". 
-Therefore httpdlog_trimquote() is used to strip the leading and
+Therefore access_log_trimquote() is used to strip the leading and
 trailing quotes.
  */
-static char * httpdlog_trimquote(const char *q_str)
+static char * access_log_trimquote(const char *q_str)
 {
     int q_str_len = strlen(q_str);
     int start = 0;
@@ -118,7 +118,7 @@ Remove quotes unless escaped.
 becomes 
     a "string"
  */
-static char * httpdlog_unquote(const char *q_str)
+static char * access_log_unquote(const char *q_str)
 {
   int q_str_len = strlen(q_str);
 
@@ -144,7 +144,7 @@ static char * httpdlog_unquote(const char *q_str)
   return u_str;
 }
 
-typedef struct httpdlog_cursor_s {
+typedef struct access_log_cursor_s {
     sqlite3_vtab_cursor   cur;               /* this must be first */
 
     gzFile           *fptr;                    /* used to scan file */
@@ -157,10 +157,10 @@ typedef struct httpdlog_cursor_s {
     int            line_ptrs_valid;          /* flag for scan data */
     char           *(line_ptrs[TABLE_COLS]); /* array of pointers */
     int            line_size[TABLE_COLS];    /* length of data for each pointer */
-} httpdlog_cursor;
+} access_log_cursor;
 
 
-static int httpdlog_get_line( httpdlog_cursor *c )
+static int access_log_get_line( access_log_cursor *c )
 {
     char   *cptr;
     int    rc = SQLITE_OK;
@@ -206,7 +206,7 @@ static int httpdlog_get_line( httpdlog_cursor *c )
     return rc;
 }
 
-static int httpdlog_scanline( httpdlog_cursor *c )
+static int access_log_scanline( access_log_cursor *c )
 {
     char   *start = c->line, *end = NULL, next = ' ';
     int    i;
@@ -284,11 +284,11 @@ static int httpdlog_scanline( httpdlog_cursor *c )
 }
 
 
-static int httpdlog_connect( sqlite3 *db, void *udp, int argc, 
+static int access_log_connect( sqlite3 *db, void *udp, int argc, 
         const char *const *argv, sqlite3_vtab **vtab, char **errmsg )
 {
-    httpdlog_vtab  *v = NULL;
-    const char   *filename = httpdlog_trimquote(argv[3]);
+    access_log_vtab  *v = NULL;
+    const char   *filename = access_log_trimquote(argv[3]);
     gzFile         *ftest;
 
     if ( argc != 4 ) return SQLITE_ERROR;
@@ -304,7 +304,7 @@ static int httpdlog_connect( sqlite3 *db, void *udp, int argc,
     gzclose( ftest );
 
     /* alloccate structure and set data */
-    v = sqlite3_malloc( sizeof( httpdlog_vtab ) );
+    v = sqlite3_malloc( sizeof( access_log_vtab ) );
     if ( v == NULL ) return SQLITE_NOMEM;
     ((sqlite3_vtab*)v)->zErrMsg = NULL; /* need to init this */
 
@@ -315,27 +315,27 @@ static int httpdlog_connect( sqlite3 *db, void *udp, int argc,
     }
     v->db = db;
 
-    sqlite3_declare_vtab( db, httpdlog_sql );
+    sqlite3_declare_vtab( db, access_log_sql );
     *vtab = (sqlite3_vtab*)v;
     return SQLITE_OK;
 }
 
-static int httpdlog_disconnect( sqlite3_vtab *vtab )
+static int access_log_disconnect( sqlite3_vtab *vtab )
 {
-    sqlite3_free( ((httpdlog_vtab*)vtab)->filename );
+    sqlite3_free( ((access_log_vtab*)vtab)->filename );
     sqlite3_free( vtab );
     return SQLITE_OK;
 }
 
-static int httpdlog_bestindex( sqlite3_vtab *vtab, sqlite3_index_info *info )
+static int access_log_bestindex( sqlite3_vtab *vtab, sqlite3_index_info *info )
 {
     return SQLITE_OK;
 }
 
-static int httpdlog_open( sqlite3_vtab *vtab, sqlite3_vtab_cursor **cur )
+static int access_log_open( sqlite3_vtab *vtab, sqlite3_vtab_cursor **cur )
 {
-    httpdlog_vtab     *v = (httpdlog_vtab*)vtab;
-    httpdlog_cursor   *c;
+    access_log_vtab     *v = (access_log_vtab*)vtab;
+    access_log_cursor   *c;
     gzFile            *fptr;
     char            *cmd;
 
@@ -345,7 +345,7 @@ static int httpdlog_open( sqlite3_vtab *vtab, sqlite3_vtab_cursor **cur )
 
     if ( fptr == NULL ) return SQLITE_ERROR;
 
-    c = sqlite3_malloc( sizeof( httpdlog_cursor ) );
+    c = sqlite3_malloc( sizeof( access_log_cursor ) );
     if ( c == NULL ) {
         gzclose( fptr );
         return SQLITE_NOMEM;
@@ -356,49 +356,49 @@ static int httpdlog_open( sqlite3_vtab *vtab, sqlite3_vtab_cursor **cur )
     return SQLITE_OK;
 }
 
-static int httpdlog_close( sqlite3_vtab_cursor *cur )
+static int access_log_close( sqlite3_vtab_cursor *cur )
 {
-    if ( ((httpdlog_cursor*)cur)->fptr != NULL ) {
-        gzclose( ((httpdlog_cursor*)cur)->fptr );
+    if ( ((access_log_cursor*)cur)->fptr != NULL ) {
+        gzclose( ((access_log_cursor*)cur)->fptr );
     }
     sqlite3_free( cur );
     return SQLITE_OK;
 }
 
-static int httpdlog_filter( sqlite3_vtab_cursor *cur,
+static int access_log_filter( sqlite3_vtab_cursor *cur,
         int idxnum, const char *idxstr,
         int argc, sqlite3_value **value )
 {
-    httpdlog_cursor   *c = (httpdlog_cursor*)cur;
+    access_log_cursor   *c = (access_log_cursor*)cur;
 
    gzseek( c->fptr, 0, SEEK_SET );
     c->row = 0;
     c->eof = 0;
-    return httpdlog_get_line( (httpdlog_cursor*)cur );
+    return access_log_get_line( (access_log_cursor*)cur );
 }
 
-static int httpdlog_next( sqlite3_vtab_cursor *cur )
+static int access_log_next( sqlite3_vtab_cursor *cur )
 {
-    return httpdlog_get_line( (httpdlog_cursor*)cur );
+    return access_log_get_line( (access_log_cursor*)cur );
 }
 
-static int httpdlog_eof( sqlite3_vtab_cursor *cur )
+static int access_log_eof( sqlite3_vtab_cursor *cur )
 {
-    return ((httpdlog_cursor*)cur)->eof;
+    return ((access_log_cursor*)cur)->eof;
 }
 
-static int httpdlog_rowid( sqlite3_vtab_cursor *cur, sqlite3_int64 *rowid )
+static int access_log_rowid( sqlite3_vtab_cursor *cur, sqlite3_int64 *rowid )
 {
-    *rowid = ((httpdlog_cursor*)cur)->row;
+    *rowid = ((access_log_cursor*)cur)->row;
     return SQLITE_OK;
 }
 
-static int httpdlog_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int cidx )
+static int access_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int cidx )
 {
-    httpdlog_cursor    *c = (httpdlog_cursor*)cur;
+    access_log_cursor    *c = (access_log_cursor*)cur;
 
     if ( c->line_ptrs_valid == 0 ) {
-        httpdlog_scanline( c );         /* scan line, if required */
+        access_log_scanline( c );         /* scan line, if required */
     }
     if ( c->line_size[cidx] < 0 ) {   /* field not scanned and set */
         sqlite3_result_null( ctx );
@@ -460,37 +460,37 @@ static int httpdlog_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int 
     return SQLITE_OK;
 }
 
-static int httpdlog_rename( sqlite3_vtab *vtab, const char *newname )
+static int access_log_rename( sqlite3_vtab *vtab, const char *newname )
 {
     return SQLITE_OK;
 }
 
 
-static sqlite3_module httpdlog_mod = {
+static sqlite3_module access_log_mod = {
     1,                   /* iVersion        */
-    httpdlog_connect,      /* xCreate()       */
-    httpdlog_connect,      /* xConnect()      */
-    httpdlog_bestindex,    /* xBestIndex()    */
-    httpdlog_disconnect,   /* xDisconnect()   */
-    httpdlog_disconnect,   /* xDestroy()      */
-    httpdlog_open,         /* xOpen()         */
-    httpdlog_close,        /* xClose()        */
-    httpdlog_filter,       /* xFilter()       */
-    httpdlog_next,         /* xNext()         */
-    httpdlog_eof,          /* xEof()          */
-    httpdlog_column,       /* xColumn()       */
-    httpdlog_rowid,        /* xRowid()        */
+    access_log_connect,      /* xCreate()       */
+    access_log_connect,      /* xConnect()      */
+    access_log_bestindex,    /* xBestIndex()    */
+    access_log_disconnect,   /* xDisconnect()   */
+    access_log_disconnect,   /* xDestroy()      */
+    access_log_open,         /* xOpen()         */
+    access_log_close,        /* xClose()        */
+    access_log_filter,       /* xFilter()       */
+    access_log_next,         /* xNext()         */
+    access_log_eof,          /* xEof()          */
+    access_log_column,       /* xColumn()       */
+    access_log_rowid,        /* xRowid()        */
     NULL,                /* xUpdate()       */
     NULL,                /* xBegin()        */
     NULL,                /* xSync()         */
     NULL,                /* xCommit()       */
     NULL,                /* xRollback()     */
     NULL,                /* xFindFunction() */
-    httpdlog_rename        /* xRename()       */
+    access_log_rename        /* xRename()       */
 };
 
 int sqlite3_extension_init( sqlite3 *db, char **error, const sqlite3_api_routines *api )
 {
     SQLITE_EXTENSION_INIT2(api);
-    return sqlite3_create_module( db, "httpdlog", &httpdlog_mod, NULL );
+    return sqlite3_create_module( db, "access_log", &access_log_mod, NULL );
 }

@@ -10,7 +10,7 @@ It currently only supports the Apache HTTPD access log. Support for Tomcat's cat
 
 - sqlite3 with support for external modules. The stock CentOS sqlite package meets this requirement.
 
-- a website that follows EuPathDB's file naming and location conventions so that the log file can be located for a given hostname. Alternatively the `httpdlog.so` module can be manually loaded into an `sqlite3` session and a virtual table manually created for an apache log file.
+- a website that follows EuPathDB's file naming and location conventions so that the log file can be located for a given hostname. Alternatively the `access_log.so` module can be manually loaded into an `sqlite3` session and a virtual table manually created for an apache log file.
 
 ### Build
 
@@ -24,10 +24,10 @@ Invoke the `cattoy` script with the desired website hostname.
 
     cattoy <hostname>
 
-Invoke desired SQL queries.
+Invoke desired SQL queries against the `access_log` table.
 
     cattoy> SELECT url, status
-       ...> FROM httpdlog
+       ...> FROM access_log
        ...> WHERE remote_host = '208.65.89.219'
        ...> AND request like '%gbrowse%'
        ...> AND method = 'POST';
@@ -38,9 +38,9 @@ Invoke desired SQL queries.
 
 See SQLite documentation for supported SQL syntax.
 
-The columns of the`httpdlog` table can be listed using the `table_info` pragma.
+The columns of the`access_log` table can be listed using the `table_info` pragma.
 
-    cattoy> PRAGMA table_info(httpdlog);
+    cattoy> PRAGMA table_info(access_log);
 
     0|remote_host|TEXT|0||0
     1|remote_user|TEXT|0||0
@@ -52,7 +52,7 @@ The columns of the`httpdlog` table can be listed using the `table_info` pragma.
 
 ### Alternative Usage
 
-If you want to forego the `cattoy` script, the `httpdlog.so` module can be manually loaded into an `sqlite3` session and a virtual table manually created for an apache log file.
+If you want to forego the `cattoy` script, the `access_log.so` module can be manually loaded into an `sqlite3` session and a virtual table manually created for an apache log file.
 
 Start the CLI client
 
@@ -64,5 +64,5 @@ Load the module,
 
 Create a virtual table. Gzip compressed logs are supported.
 
-    sqlite> create virtual table httpdlog using weblog("/var/log/httpd/dev.trichdb.org/access_log-20140101.gz");
+    sqlite> create virtual table access_log using weblog("/var/log/httpd/dev.trichdb.org/access_log-20140101.gz");
 
