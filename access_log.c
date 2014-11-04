@@ -60,7 +60,7 @@ const static char *access_log_sql =
 "        line                  TEXT HIDDEN     "  /* 20 */
 "     );                                       ";
 
-#define TABLE_COLS_SCAN  10 /* number cols read from log entry */
+#define TABLE_COLS_SCAN  10 /* number cols read directly from log entry */
 #define TABLE_COLS       21 /* total columns in table: direct log + computed */
 
 
@@ -115,7 +115,7 @@ static char * access_log_trimquote(const char *q_str)
 typedef struct access_log_cursor_s {
     sqlite3_vtab_cursor   cur;               /* this must be first */
 
-    gzFile           *fptr;                    /* used to scan file */
+    gzFile         *fptr;                    /* used to scan file */
     sqlite_int64   row;                      /* current row count (ROWID) */
     int            eof;                      /* EOF flag */
 
@@ -134,8 +134,7 @@ static int access_log_get_line( access_log_cursor *c )
 
     c->row++;                          /* advance row (line) counter */
     c->line_ptrs_valid = 0;            /* reset scan flag */
-//    cptr =fgets( c->line, LINESIZE, c->fptr );
-    cptr =gzgets( c->fptr, c->line, LINESIZE );
+    cptr = gzgets( c->fptr, c->line, LINESIZE );
     if ( cptr == NULL ) {  /* found the end of the file/error */
         if (gzeof( c->fptr ) ) {
             c->eof = 1;
