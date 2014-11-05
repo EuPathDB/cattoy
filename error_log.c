@@ -3,6 +3,7 @@
 Initial starting code based on examples from
 Using SQLite by Jay A. Kreibich. Copyright 2010 O'Reilly Media, Inc., 978-0-596-52118-9
 */
+
 #define _XOPEN_SOURCE
 
 #include "sqlite3ext.h"
@@ -246,7 +247,7 @@ static int error_log_scanline( error_log_cursor *c )
     }
 
     /* time_epoch   */
-       c->line_size[13] = 2;
+    c->line_size[13] = 2;
 
     /* line */
     c->line_ptrs[14] = c->line;
@@ -436,7 +437,7 @@ static int error_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int
       else
         epoch = -1;
 
-      sqlite3_result_int( ctx,  (epoch) );
+      sqlite3_result_int( ctx, epoch );
       return SQLITE_OK;
     }
     default:
@@ -454,7 +455,7 @@ static int error_log_rename( sqlite3_vtab *vtab, const char *newname )
 
 
 static sqlite3_module error_log_mod = {
-    1,                   /* iVersion        */
+    1,                      /* iVersion        */
     error_log_connect,      /* xCreate()       */
     error_log_connect,      /* xConnect()      */
     error_log_bestindex,    /* xBestIndex()    */
@@ -467,12 +468,12 @@ static sqlite3_module error_log_mod = {
     error_log_eof,          /* xEof()          */
     error_log_column,       /* xColumn()       */
     error_log_rowid,        /* xRowid()        */
-    NULL,                /* xUpdate()       */
-    NULL,                /* xBegin()        */
-    NULL,                /* xSync()         */
-    NULL,                /* xCommit()       */
-    NULL,                /* xRollback()     */
-    NULL,                /* xFindFunction() */
+    NULL,                   /* xUpdate()       */
+    NULL,                   /* xBegin()        */
+    NULL,                   /* xSync()         */
+    NULL,                   /* xCommit()       */
+    NULL,                   /* xRollback()     */
+    NULL,                   /* xFindFunction() */
     error_log_rename        /* xRename()       */
 };
 
