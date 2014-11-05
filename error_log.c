@@ -3,6 +3,7 @@
 Initial starting code based on examples from
 Using SQLite by Jay A. Kreibich. Copyright 2010 O'Reilly Media, Inc., 978-0-596-52118-9
 */
+#define _XOPEN_SOURCE
 
 #include "sqlite3ext.h"
 SQLITE_EXTENSION_INIT1;
@@ -11,6 +12,7 @@ SQLITE_EXTENSION_INIT1;
 #include <stdio.h>
 #include <string.h>
 #include <zlib.h>
+#include <time.h>
 
 /**
 The expected log format is Apache hTTPD Server's 2.3 error log format 
@@ -50,13 +52,14 @@ const static char *error_log_sql =
 "        time_hour             INTEGER,        "  /* 10 */
 "        time_min              INTEGER,        "  /* 11 */
 "        time_sec              INTEGER,        "  /* 12 */
-"        line                  TEXT HIDDEN     "  /* 13 */
+"        time_epoch            INTEGER,        "  /* 13 */
+"        line                  TEXT HIDDEN     "  /* 14 */
 "     );                                       ";
 
 #define TABLE_COLS_SCAN   3 /* number of internal cols parsed from log entry, 
                                not including the message which is everything
                                after the can until the end of line */
-#define TABLE_COLS       14 /* total columns in table: direct log + computed */
+#define TABLE_COLS       15 /* total columns in table: direct log + computed */
 
 
 typedef struct error_log_vtab_s {
@@ -209,7 +212,8 @@ static int error_log_scanline( error_log_cursor *c )
       c->line_size[2] = 0;
     }
 
-    c->line_ptrs[3] = start;
+    /* message to end of line */
+    c->line_ptrs[3] = start +1;
     c->line_size[3] = strlen(c->line_ptrs[3]);
     
     /* process special fields */
@@ -241,9 +245,12 @@ static int error_log_scanline( error_log_cursor *c )
         c->line_ptrs[12] = &start[17];   c->line_size[12] = 2; /* time_sec   */
     }
 
+    /* time_epoch   */
+       c->line_size[13] = 2;
+
     /* line */
-    c->line_ptrs[13] = c->line;
-    c->line_size[13] = c->line_len;
+    c->line_ptrs[14] = c->line;
+    c->line_size[14] = c->line_len;
 
     c->line_ptrs_valid = 1;
     return SQLITE_OK;
@@ -362,6 +369,8 @@ static int error_log_rowid( sqlite3_vtab_cursor *cur, sqlite3_int64 *rowid )
 static int error_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int cidx )
 {
     error_log_cursor    *c = (error_log_cursor*)cur;
+    struct tm tm;
+    time_t epoch;
 
     if ( c->line_ptrs_valid == 0 ) {
         error_log_scanline( c );         /* scan line, if required */
@@ -416,6 +425,20 @@ static int error_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int
     case 12:   /* second */
         sqlite3_result_int( ctx, atoi( c->line_ptrs[cidx] ) );
         return SQLITE_OK;
+    case 13: { /* time_epoch */
+      
+      char ts[25];
+      memcpy(ts, c->line_ptrs[0], 24); ts[24] = '\0';    
+      
+      //if ( strptime("Tue Nov 04 21:20:00 2014", "%a %b %d %H:%M:%S %Y", &tm) != NULL )
+      if ( strptime(ts, "%a %b %d %H:%M:%S %Y", &tm) != NULL )
+        epoch = mktime(&tm);
+      else
+        epoch = -1;
+
+      sqlite3_result_int( ctx,  (epoch) );
+      return SQLITE_OK;
+    }
     default:
         break;
     }
