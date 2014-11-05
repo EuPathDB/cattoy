@@ -4,6 +4,8 @@ Initial starting code based on examples from
 Using SQLite by Jay A. Kreibich. Copyright 2010 O'Reilly Media, Inc., 978-0-596-52118-9
 */
 
+#define _XOPEN_SOURCE
+
 #include "sqlite3ext.h"
 SQLITE_EXTENSION_INIT1;
 
@@ -11,6 +13,7 @@ SQLITE_EXTENSION_INIT1;
 #include <stdio.h>
 #include <string.h>
 #include <zlib.h>
+#include <time.h>
 
 /**
 The expected log format is NCSA combined with the addition of %D.
@@ -55,13 +58,14 @@ const static char *access_log_sql =
 "        time_hour             INTEGER,        "  /* 15 */
 "        time_min              INTEGER,        "  /* 16 */
 "        time_sec              INTEGER,        "  /* 17 */
-"        method                TEXT,           "  /* 18 */
-"        url                   TEXT,           "  /* 19 */
-"        line                  TEXT HIDDEN     "  /* 20 */
+"        time_epoch            INTEGER,        "  /* 18 */
+"        method                TEXT,           "  /* 19 */
+"        url                   TEXT,           "  /* 20 */
+"        line                  TEXT HIDDEN     "  /* 21 */
 "     );                                       ";
 
 #define TABLE_COLS_SCAN  10 /* number cols read directly from log entry */
-#define TABLE_COLS       21 /* total columns in table: direct log + computed */
+#define TABLE_COLS       22 /* total columns in table: direct log + computed */
 
 
 typedef struct access_log_vtab_s {
@@ -227,23 +231,26 @@ static int access_log_scanline( access_log_cursor *c )
         c->line_ptrs[17] = &start[18];   c->line_size[17] = 2; /* time_sec   */
     }
 
-    /* req_op, req_url */
+    /* method, req_url */
     start = c->line_ptrs[4];
     end = ( start == NULL ? NULL : strchr( start, ' ' ) );
     if ( end != NULL ) {
-        c->line_ptrs[18] = start; /* req_op */
-        c->line_size[18] = end - start;
+        c->line_ptrs[19] = start; /* req_op */
+        c->line_size[19] = end - start;
         start = end + 1;
     }
     end = ( start == NULL ? NULL : strchr( start, ' ' ) );
     if ( end != NULL ) {
-        c->line_ptrs[19] = start;  /* req_url */
-        c->line_size[19] = end - start;
+        c->line_ptrs[20] = start;  /* req_url */
+        c->line_size[20] = end - start;
     }
 
+    /* time_epoch   */
+    c->line_size[18] = 2;
+
     /* line */
-    c->line_ptrs[20] = c->line;
-    c->line_size[20] = c->line_len;
+    c->line_ptrs[21] = c->line;
+    c->line_size[21] = c->line_len;
 
     c->line_ptrs_valid = 1;
     return SQLITE_OK;
@@ -362,6 +369,8 @@ static int access_log_rowid( sqlite3_vtab_cursor *cur, sqlite3_int64 *rowid )
 static int access_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int cidx )
 {
     access_log_cursor    *c = (access_log_cursor*)cur;
+    struct tm tm;
+    time_t epoch;
 
     if ( c->line_ptrs_valid == 0 ) {
         access_log_scanline( c );         /* scan line, if required */
@@ -418,6 +427,20 @@ static int access_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, in
     case 17:   /* second */
         sqlite3_result_int( ctx, atoi( c->line_ptrs[cidx] ) );
         return SQLITE_OK;
+    case 18: { /* time_epoch */
+      
+      char ts[27];
+      memcpy(ts, c->line_ptrs[3], 26); ts[26] = '\0';    
+
+      //if ( strptime("04/Nov/2014:13:15:48 -0500", "%d/%b/%Y:%H:%M:%S", &tm) != NULL )
+      if ( strptime(ts, "%d/%b/%Y:%H:%M:%S", &tm) != NULL )
+        epoch = mktime(&tm);
+      else
+        epoch = -1;
+
+      sqlite3_result_int( ctx, epoch );
+      return SQLITE_OK;
+    }
     default:
         break;
     }
@@ -433,7 +456,7 @@ static int access_log_rename( sqlite3_vtab *vtab, const char *newname )
 
 
 static sqlite3_module access_log_mod = {
-    1,                   /* iVersion        */
+    1,                       /* iVersion        */
     access_log_connect,      /* xCreate()       */
     access_log_connect,      /* xConnect()      */
     access_log_bestindex,    /* xBestIndex()    */
@@ -446,12 +469,12 @@ static sqlite3_module access_log_mod = {
     access_log_eof,          /* xEof()          */
     access_log_column,       /* xColumn()       */
     access_log_rowid,        /* xRowid()        */
-    NULL,                /* xUpdate()       */
-    NULL,                /* xBegin()        */
-    NULL,                /* xSync()         */
-    NULL,                /* xCommit()       */
-    NULL,                /* xRollback()     */
-    NULL,                /* xFindFunction() */
+    NULL,                    /* xUpdate()       */
+    NULL,                    /* xBegin()        */
+    NULL,                    /* xSync()         */
+    NULL,                    /* xCommit()       */
+    NULL,                    /* xRollback()     */
+    NULL,                    /* xFindFunction() */
     access_log_rename        /* xRename()       */
 };
 
