@@ -48,6 +48,8 @@ fi
 
 INIT="
 .prompt 'cattoy> '
+.mode column
+.headers on
 .load access_log.so
 .load error_log.so
 create virtual table access_log using access_log('$ACCESS_LOG');
