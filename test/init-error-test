@@ -1,0 +1,4 @@
+-- sqlite3 -init init-error-test
+
+.load error_log.so
+create virtual table error_log using error_log('test_error_log');

@@ -1,0 +1,4 @@
+-- sqlite3 -init init-access-test
+
+.load access_log.so
+create virtual table access_log using access_log('test_access_log');

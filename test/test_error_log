@@ -1,0 +1,3 @@
+[Sat Oct 11 00:26:42 2014] [error] [client 192.168.210.200] which: no inkscape in (/sbin:/usr/sbin:/bin:/usr/bin)
+[Tue Nov 04 13:14:32 2014] [debug] proxy_util.c(1852): proxy: worker already initialized
+[Wed Nov 05 05:27:07 2014] [error] [client 10.15.20.200] [Tue Nov  4 00:27:07 2014] gbrowse: DBD::Oracle::db ping failed: ORA-03135: connection lost contact (DBD ERROR: OCISessionServerRelease) at /usr/share/perl5/vendor_perl/CGI/Session/Driver/DBI.pm line 136 during global destruction., referer: http://integrate.foodb.org/cgi-bin/gbrowse/foodb/
