@@ -14,6 +14,7 @@ SQLITE_EXTENSION_INIT1;
 #include <string.h>
 #include <zlib.h>
 #include <time.h>
+#include <math.h>
 
 /**
 The expected log format is NCSA combined with the addition of %D.
@@ -369,8 +370,6 @@ static int access_log_rowid( sqlite3_vtab_cursor *cur, sqlite3_int64 *rowid )
 static int access_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, int cidx )
 {
     access_log_cursor    *c = (access_log_cursor*)cur;
-    struct tm tm;
-    time_t epoch;
 
     if ( c->line_ptrs_valid == 0 ) {
         access_log_scanline( c );         /* scan line, if required */
@@ -393,10 +392,10 @@ static int access_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, in
                 start = end + 1;
             }
         }
-        v += ( oct[3] == NULL ? 0 : atoi( oct[3] ) ); v *= 256;
-        v += ( oct[2] == NULL ? 0 : atoi( oct[2] ) ); v *= 256;
-        v += ( oct[1] == NULL ? 0 : atoi( oct[1] ) ); v *= 256;
-        v += ( oct[0] == NULL ? 0 : atoi( oct[0] ) );
+        v += ( ( oct[0] == NULL ? 0 : atoi( oct[0] ) ) * pow(256, 3) );
+        v += ( ( oct[1] == NULL ? 0 : atoi( oct[1] ) ) * pow(256, 2) );
+        v += ( ( oct[2] == NULL ? 0 : atoi( oct[2] ) ) *     256     );
+        v +=   ( oct[3] == NULL ? 0 : atoi( oct[3] ) );
         sqlite3_result_int64( ctx, v );
         return SQLITE_OK;
     }
@@ -427,8 +426,12 @@ static int access_log_column( sqlite3_vtab_cursor *cur, sqlite3_context *ctx, in
     case 17:   /* second */
         sqlite3_result_int( ctx, atoi( c->line_ptrs[cidx] ) );
         return SQLITE_OK;
-    case 18: { /* time_epoch */
-      
+    case 18: { /* time_epoch - check results against http://www.epochconverter.com */
+
+      time_t epoch;
+      struct tm tm;
+      tm.tm_isdst = -1;
+
       char ts[27];
       memcpy(ts, c->line_ptrs[3], 26); ts[26] = '\0';    
 
