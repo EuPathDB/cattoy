@@ -1,8 +1,8 @@
-# cattoy
+# cattoy 
 
 Play with website logs using SQL.
 
-cattoy loads website logs into an SQLite virtual table where they can be queried with SQL.
+Cattoy loads website logs into an SQLite virtual table where they can be mined with SQL queries.
 
 ### Requirements
 
@@ -13,17 +13,6 @@ cattoy loads website logs into an SQLite virtual table where they can be queried
 - The expected log format is NCSA combined with the addition of %D.
 
     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" %D
-
-### Caveats
-
-It currently only supports the Apache HTTPD access log. Support for Tomcat's catalina and WDK application logs are future desires.
-
-
-### Build
-
-    $ make
-
-This should generate a `httpd.so` file. The `cattoy` shell script will load this into an `sqlite3` session.
 
 ### Usage
 
@@ -73,3 +62,15 @@ Create a virtual table. Gzip compressed logs are supported.
 
     sqlite> create virtual table access_log using weblog("/var/log/httpd/dev.trichdb.org/access_log-20140101.gz");
 
+### Caveats
+
+It currently only supports the Apache HTTPD access and error logs. Support for Tomcat's catalina and WDK application logs are future desires.
+
+
+### Build
+
+The sqlite libraries are needed to build the source. On RHEL derivatives, these are provided by the `sqlite-devel` RPM.
+
+    $ make
+
+This should generate `access_log.so` and `error_log.so` files. The `cattoy` shell script will load this into an `sqlite3` session.
